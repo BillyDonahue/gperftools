@@ -196,6 +196,8 @@ AC_PROG_CPP
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
 AM_PROG_CC_C_O      # shrug: autogen.sh suddenly needs this for some reason
 
+AX_CXX_COMPILE_STDCXX(11, ext, mandatory)
+
 # Check if we have an objcopy installed that supports -W
 AC_CHECK_TOOL([OBJCOPY], [objcopy], [])
 AS_IF([test -n "$OBJCOPY"], [dnl
@@ -236,6 +238,7 @@ AC_CHECK_TYPES([__int64])       # defined in some windows platforms
 AC_CHECK_TYPES([struct mallinfo],,, [#include <malloc.h>])
 AC_CHECK_TYPES([Elf32_Versym],,, [#include <elf.h>])   # for vdso_support.h
 AC_CHECK_FUNCS(sbrk)            # for tcmalloc to get memory
+AC_CHECK_FUNCS(__sbrk)          # for tcmalloc to get memory
 AC_CHECK_FUNCS(geteuid)         # for turning off services when run as root
 AC_CHECK_FUNCS(fork)            # for the pthread_atfork setup
 AC_CHECK_HEADERS(features.h)    # for vdso_support.h
@@ -391,6 +394,16 @@ AC_CACHE_CHECK([if the compiler supports -Wno-unused-result],
 AM_CONDITIONAL(HAVE_W_NO_UNUSED_RESULT,
 	       test "$perftools_cv_w_no_unused_result" = yes)
 
+AC_ARG_ENABLE([deprecated-pprof],
+              [AS_HELP_STRING([--disable-deprecated-pprof],
+                [do not install old deprecated and unmaintained bundled pprof
+(see github.com/google/pprof for supported version)])],
+              [enable_pprof="$enableval"],
+              [enable_pprof=yes])
+
+AM_CONDITIONAL(INSTALL_PPROF,
+               [test "x$enable_pprof" = xyes])
+
 AC_ARG_ENABLE([dynamic-sized-delete-support],
               [AS_HELP_STRING([--enable-dynamic-sized-delete-support],
                 [try to build run-time switch for sized delete operator])],
@@ -512,14 +525,6 @@ AC_MSG_CHECKING([for __builtin_stack_pointer()])
 AC_LINK_IFELSE([AC_LANG_PROGRAM(, [void *sp = __builtin_stack_pointer()])],
                [AC_DEFINE(HAVE_BUILTIN_STACK_POINTER, 1,
                       Define to 1 if compiler supports __builtin_stack_pointer)
-                AC_MSG_RESULT([yes])],
-               [AC_MSG_RESULT([no])])
-
-# Check for __builtin_expect()
-AC_MSG_CHECKING([for __builtin_expect()])
-AC_LINK_IFELSE([AC_LANG_PROGRAM(, return __builtin_expect(main != 0, 1))],
-               [AC_DEFINE(HAVE_BUILTIN_EXPECT, 1,
-                          Define to 1 if compiler supports __builtin_expect)
                 AC_MSG_RESULT([yes])],
                [AC_MSG_RESULT([no])])
 
@@ -699,6 +704,15 @@ AC_COMPILE_IFELSE(
          have_linux_sigev_thread_id=yes
          AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
+
+# Disable large allocation report by default.
+AC_ARG_ENABLE([large-alloc-report],
+              [AS_HELP_STRING([--enable-large-alloc-report],
+                              [report very large allocations to stderr])],
+              [enable_large_alloc_report="$enableval"],
+              [enable_large_alloc_report=no])
+AS_IF([test "x$enable_large_alloc_report" = xyes],
+      [AC_DEFINE([ENABLE_LARGE_ALLOC_REPORT], 1, [report large allocation])])
 
 # Write generated configuration file
 AC_CONFIG_FILES([Makefile
